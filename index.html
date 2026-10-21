@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>لعبة دريفت وهجولة - هيونداي إلنترا N</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #020617;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: #fff;
+        }
+        #canvas-container {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #webgl-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* شاشة التحميل */
+        #loading-screen {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .loader-ring {
+            width: 80px;
+            height: 80px;
+            border: 5px solid rgba(0, 229, 255, 0.15);
+            border-top: 5px solid #00e5ff;
+            border-radius: 50%;
+            animation: ringSpin 1s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+            margin-bottom: 25px;
+            box-shadow: 0 0 25px rgba(0, 229, 255, 0.3);
+        }
+        @keyframes ringSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: #38bdf8;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            text-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+        }
+        .loading-progress {
+            font-size: 14px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+        .bar-container {
+            width: 260px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 4px;
+            margin-top: 15px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .progress-bar-fill {
+            height: 100%;
+            width: 10%;
+            background: linear-gradient(90deg, #0284c7, #38bdf8);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px #38bdf8;
+        }
+
+        /* واجهة اللعبة - HUD */
+        #hud {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px;
+        }
+
+        /* شريط المعلومات العلوي */
+        .hud-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .drift-box {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 16px;
+            padding: 14px 28px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 189, 248, 0.15);
+        }
+        .drift-tag {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: #94a3b8;
+            text-transform: uppercase;
+        }
+        .drift-val {
+            font-size: 38px;
+            font-weight: 900;
+            color: #38bdf8;
+            line-height: 1.1;
+            font-family: 'Arial Black', Impact, sans-serif;
+            text-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+        }
+        .drift-mult {
+            display: inline-block;
+            background: #f43f5e;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 900;
+            padding: 2px 8px;
+            border-radius: 8px;
+            margin-top: 4px;
+            box-shadow: 0 0 10px rgba(244, 63, 94, 0.6);
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.2s;
+        }
+        .drift-mult.active {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .hud-top-actions {
+            pointer-events: auto;
+            display: flex;
+            gap: 10px;
+        }
+        .hud-btn {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #f1f5f9;
+            padding: 11px 18px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: all 0.15s ease;
+        }
+        .hud-btn:hover {
+            background: rgba(30, 41, 59, 0.9);
+            border-color: #38bdf8;
+            color: #38bdf8;
+        }
+        .hud-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* عداد العدادات الدائري - سرعة + RPM */
+        .cluster-panel {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            width: 190px;
+            height: 190px;
+            background: radial-gradient(circle at center, rgba(15, 23, 42, 0.92) 0%, rgba(2, 6, 23, 0.95) 100%);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 2px solid rgba(56, 189, 248, 0.25);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(56, 189, 248, 0.2), inset 0 0 30px rgba(0,0,0,0.8);
+        }
+        .rpm-gauge-svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+        .rpm-bg {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.1);
+            stroke-width: 6;
+            stroke-dasharray: 440;
+            stroke-dashoffset: 110;
+        }
+        .rpm-fill {
+            fill: none;
+            stroke: url(#rpm-gradient);
+            stroke-width: 6;
+            stroke-dasharray: 440;
+            stroke-dashoffset: 440;
+            transition: stroke-dashoffset 0.08s linear;
+        }
+        .gear-indicator {
+            font-size: 18px;
+            font-weight: 900;
+            color: #f43f5e;
+            text-shadow: 0 0 10px rgba(244, 63, 94, 0.6);
+            margin-bottom: -4px;
+        }
+        .speed-display {
+            font-size: 58px;
+            font-weight: 900;
+            color: #ffffff;
+            line-height: 1;
+            font-family: 'Arial Black', sans-serif;
+            text-shadow: 0 0 25px rgba(255, 255, 255, 0.4);
+        }
+        .speed-unit-text {
+            font-size: 13px;
+            font-weight: 800;
+            color: #38bdf8;
+            letter-spacing: 1px;
+            margin-top: 2px;
+        }
+        .nitro-track {
+            width: 100px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            margin-top: 10px;
+            overflow: hidden;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+        .nitro-level {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #0284c7, #38bdf8);
+            border-radius: 3px;
+            box-shadow: 0 0 10px #38bdf8;
+            transition: width 0.1s linear;
+        }
+
+        /* أزرار لمس الموبايل / Lens Web */
+        .touch-controls {
+            position: absolute;
+            bottom: 24px;
+            left: 24px;
+            display: flex;
+            gap: 14px;
+            pointer-events: auto;
+        }
+        .t-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .touch-btn {
+            width: 68px;
+            height: 68px;
+            border-radius: 20px;
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 255, 255, 0.18);
+            color: #ffffff;
+            font-size: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+            transition: all 0.1s;
+        }
+        .touch-btn:active, .touch-btn.active {
+            background: rgba(56, 189, 248, 0.45);
+            border-color: #38bdf8;
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.6);
+            transform: scale(0.92);
+        }
+        .btn-nitro-style {
+            background: rgba(2, 132, 199, 0.25);
+            border-color: rgba(56, 189, 248, 0.5);
+            font-size: 15px;
+            font-weight: 800;
+            color: #38bdf8;
+        }
+        .btn-handbrake-style {
+            background: rgba(244, 63, 94, 0.25);
+            border-color: rgba(244, 63, 94, 0.5);
+            font-size: 15px;
+            font-weight: 800;
+            color: #f43f5e;
+        }
+
+        /* رسالة ترحيب ومساعدة أزرار الكمبيوتر */
+        .key-hints {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 8px 18px;
+            font-size: 12px;
+            color: #94a3b8;
+            pointer-events: none;
+            display: flex;
+            gap: 16px;
+        }
+        .key-hints span b {
+            color: #38bdf8;
+        }
+
+        @media (pointer: coarse) {
+            .key-hints { display: none; }
+        }
+        @media (min-width: 950px) {
+            .touch-controls { display: none; }
+        }
+    </style>
+    <!-- Three.js + GLTFLoader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+
+    <!-- شاشة التحميل -->
+    <div id="loading-screen">
+        <div class="loader-ring"></div>
+        <div class="loading-title">هيونداي إلنترا N - دريفت سيتي</div>
+        <div class="loading-progress" id="loadStatus">جاري تحميل مسار المدينة والسيارة...</div>
+        <div class="bar-container">
+            <div class="progress-bar-fill" id="barFill"></div>
+        </div>
+    </div>
+
+    <!-- الكانفاس -->
+    <div id="canvas-container">
+        <canvas id="webgl-canvas"></canvas>
+    </div>
+
+    <!-- واجهة اللعبة والعدادات -->
+    <div id="hud">
+        <div class="hud-header">
+            <div class="drift-box">
+                <div class="drift-tag">نقاط الهجولة والدريفت</div>
+                <div class="drift-val" id="driftScoreDisplay">0</div>
+                <div class="drift-mult" id="driftMultiplier">x1</div>
+            </div>
+
+            <div class="hud-top-actions">
+                <button class="hud-btn" onclick="resetCarState()">إعادة تعيين ⟳</button>
+                <button class="hud-btn" onclick="cycleCamera()">الكاميرا (C)</button>
+                <button class="hud-btn" id="soundBtn" onclick="toggleAudio()">الصوت 🔊</button>
+            </div>
+        </div>
+
+        <div class="key-hints">
+            <span>التوجيه: <b>WASD / الأسهم</b></span>
+            <span>الجلنط: <b>Space</b></span>
+            <span>النيترو: <b>Shift</b></span>
+            <span>الكاميرا: <b>C</b></span>
+            <span>إعادة: <b>R</b></span>
+        </div>
+
+        <!-- عداد السرعة والـ RPM -->
+        <div class="cluster-panel">
+            <svg class="rpm-gauge-svg" viewBox="0 0 160 160">
+                <defs>
+                    <linearGradient id="rpm-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#38bdf8"/>
+                        <stop offset="70%" stop-color="#fbbf24"/>
+                        <stop offset="95%" stop-color="#f43f5e"/>
+                    </linearGradient>
+                </defs>
+                <circle class="rpm-bg" cx="80" cy="80" r="70"></circle>
+                <circle class="rpm-fill" id="rpmRing" cx="80" cy="80" r="70"></circle>
+            </svg>
+            <div class="gear-indicator" id="gearBadge">D1</div>
+            <div class="speed-display" id="speedMeter">0</div>
+            <div class="speed-unit-text">كم / س</div>
+            <div class="nitro-track">
+                <div class="nitro-level" id="nitroMeter"></div>
+            </div>
+        </div>
+
+        <!-- أزرار لمس الموبايل للشاشات الذكية -->
+        <div class="touch-controls">
+            <div class="t-group">
+                <button class="touch-btn" id="t-left">◀</button>
+            </div>
+            <div class="t-group">
+                <button class="touch-btn" id="t-right">▶</button>
+            </div>
+            <div class="t-group" style="margin-right: 15px;">
+                <button class="touch-btn" id="t-gas">▲</button>
+                <button class="touch-btn" id="t-brake">▼</button>
+            </div>
+            <div class="t-group">
+                <button class="touch-btn btn-nitro-style" id="t-nitro">تيربو</button>
+                <button class="touch-btn btn-handbrake-style" id="t-handbrake">جلنط</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* -------------------------------------------------------------
+           1. إعداد محرك الرسوميات Three.js والبيئة
+        ------------------------------------------------------------- */
+        const canvas = document.getElementById('webgl-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.15;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a1128);
+        scene.fog = new THREE.FogExp2(0x0a1128, 0.0012);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.2, 3500);
+
+        // الإضاءة العامة والبيئية
+        const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x0f172a, 1.2);
+        scene.add(hemiLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffedd5, 1.9);
+        sunLight.position.set(300, 500, 250);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 10;
+        sunLight.shadow.camera.far = 1200;
+        const shRange = 160;
+        sunLight.shadow.camera.left = -shRange;
+        sunLight.shadow.camera.right = shRange;
+        sunLight.shadow.camera.top = shRange;
+        sunLight.shadow.camera.bottom = -shRange;
+        sunLight.shadow.bias = -0.0005;
+        scene.add(sunLight);
+
+        // إضاءة كشافات السيارة الأمامية
+        const carHeadlightL = new THREE.SpotLight(0xffffff, 4.0, 90, Math.PI / 6, 0.4);
+        const carHeadlightR = new THREE.SpotLight(0xffffff, 4.0, 90, Math.PI / 6, 0.4);
+        carHeadlightL.position.set(-0.7, 0.65, 2.1);
+        carHeadlightR.position.set(0.7, 0.65, 2.1);
+        const targetL = new THREE.Object3D(); targetL.position.set(-0.7, 0, 30);
+        const targetR = new THREE.Object3D(); targetR.position.set(0.7, 0, 30);
+
+        /* -------------------------------------------------------------
+           2. كائنات السيارة، العجلات، والفيزياء
+        ------------------------------------------------------------- */
+        const carGroup = new THREE.Group();
+        scene.add(carGroup);
+        carGroup.add(carHeadlightL); carGroup.add(carHeadlightR);
+        carGroup.add(targetL); carGroup.add(targetR);
+        carHeadlightL.target = targetL; carHeadlightR.target = targetR;
+
+        // عجلات السيارة الدوارة والموجهة
+        const wheelMeshes = { fl: [], fr: [], rl: [], rr: [] };
+        const roadRaycastMeshes = [];
+
+        // متغيرات فيزياء وحركة السيارة
+        // إحداثيات البداية على طريق الحلبة المكتشف: X=167.3, Y=3.25, Z=69.5
+        const SPAWN_POS = new THREE.Vector3(167.28, 3.25, 69.52);
+        const SPAWN_ROTY = -Math.PI / 4; // موجه على امتداد الطريق المستقيم
+
+        const vehicle = {
+            pos: SPAWN_POS.clone(),
+            speed: 0,
+            rotY: SPAWN_ROTY,
+            steerAngle: 0,
+            maxSpeed: 65,        // يعادل 234 كم/س
+            maxReverse: -18,
+            acceleration: 30,
+            braking: 50,
+            driftSlip: 0,
+            nitro: 100,
+            rpm: 900,
+            gear: 1,
+            score: 0,
+            combo: 1,
+            isDrifting: false
+        };
+
+        const input = {
+            forward: false,
+            backward: false,
+            left: false,
+            right: false,
+            handbrake: false,
+            nitro: false
+        };
+
+        let cameraViewIndex = 0; // 0: خلفية ديناميكية, 1: كبوت, 2: كاميرا توب/درون
+
+        /* -------------------------------------------------------------
+           3. نظام الصوت التخليقي Web Audio API (بدون ملفات خارجية)
+        ------------------------------------------------------------- */
+        let audioCtx = null;
+        let engineOsc = null;
+        let engineGain = null;
+        let skidGain = null;
+        let nitroGain = null;
+        let isAudioMuted = false;
+
+        function initAudio() {
+            if (audioCtx) return;
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+
+                // 1. صوت المحرك
+                engineOsc = audioCtx.createOscillator();
+                engineOsc.type = 'sawtooth';
+                const engineFilter = audioCtx.createBiquadFilter();
+                engineFilter.type = 'lowpass';
+                engineFilter.frequency.value = 450;
+
+                engineGain = audioCtx.createGain();
+                engineGain.gain.value = 0.08;
+
+                engineOsc.connect(engineFilter);
+                engineFilter.connect(engineGain);
+                engineGain.connect(audioCtx.destination);
+                engineOsc.start();
+
+                // 2. صوت صرير الكفرات أثناء الدريفت
+                const bufferSize = audioCtx.sampleRate * 2;
+                const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+                const whiteNoise = audioCtx.createBufferSource();
+                whiteNoise.buffer = noiseBuffer;
+                whiteNoise.loop = true;
+
+                const skidFilter = audioCtx.createBiquadFilter();
+                skidFilter.type = 'bandpass';
+                skidFilter.frequency.value = 1100;
+                skidFilter.Q.value = 3.5;
+
+                skidGain = audioCtx.createGain();
+                skidGain.gain.value = 0;
+
+                whiteNoise.connect(skidFilter);
+                skidFilter.connect(skidGain);
+                skidGain.connect(audioCtx.destination);
+                whiteNoise.start();
+
+                // 3. صوت النيترو
+                const nitroNoise = audioCtx.createBufferSource();
+                nitroNoise.buffer = noiseBuffer;
+                nitroNoise.loop = true;
+                const nitroFilter = audioCtx.createBiquadFilter();
+                nitroFilter.type = 'highpass';
+                nitroFilter.frequency.value = 1500;
+
+                nitroGain = audioCtx.createGain();
+                nitroGain.gain.value = 0;
+
+                nitroNoise.connect(nitroFilter);
+                nitroFilter.connect(nitroGain);
+                nitroGain.connect(audioCtx.destination);
+                nitroNoise.start();
+
+            } catch (e) {
+                console.warn("Audio Context setup prevented:", e);
+            }
+        }
+
+        function toggleAudio() {
+            if (!audioCtx) initAudio();
+            isAudioMuted = !isAudioMuted;
+            document.getElementById('soundBtn').innerText = isAudioMuted ? 'الصوت 🔇' : 'الصوت 🔊';
+            if (audioCtx) {
+                if (isAudioMuted) audioCtx.suspend();
+                else audioCtx.resume();
+            }
+        }
+
+        /* -------------------------------------------------------------
+           4. نظام دخان الإطارات (Tire Smoke Particles)
+        ------------------------------------------------------------- */
+        const smokeCount = 80;
+        const smokeGeo = new THREE.BufferGeometry();
+        const smokePositions = new Float32Array(smokeCount * 3);
+        const smokeAlphas = new Float32Array(smokeCount);
+        const smokeData = [];
+
+        for (let i = 0; i < smokeCount; i++) {
+            smokePositions[i * 3] = 0;
+            smokePositions[i * 3 + 1] = -100;
+            smokePositions[i * 3 + 2] = 0;
+            smokeAlphas[i] = 0;
+            smokeData.push({ active: false, life: 0, maxLife: 1.0, vx: 0, vy: 0, vz: 0 });
+        }
+        smokeGeo.setAttribute('position', new THREE.BufferAttribute(smokePositions, 3));
+
+        const smokeMat = new THREE.PointsMaterial({
+            color: 0x94a3b8,
+            size: 2.4,
+            transparent: true,
+            opacity: 0.45,
+            depthWrite: false
+        });
+        const smokeParticles = new THREE.Points(smokeGeo, smokeMat);
+        scene.add(smokeParticles);
+
+        function emitSmoke(originPos) {
+            for (let i = 0; i < smokeCount; i++) {
+                if (!smokeData[i].active) {
+                    smokeData[i].active = true;
+                    smokeData[i].life = 0;
+                    smokeData[i].maxLife = 0.5 + Math.random() * 0.4;
+                    smokeData[i].vx = (Math.random() - 0.5) * 1.5;
+                    smokeData[i].vy = 0.8 + Math.random() * 1.2;
+                    smokeData[i].vz = (Math.random() - 0.5) * 1.5;
+                    smokePositions[i * 3] = originPos.x + (Math.random() - 0.5) * 0.5;
+                    smokePositions[i * 3 + 1] = originPos.y + 0.1;
+                    smokePositions[i * 3 + 2] = originPos.z + (Math.random() - 0.5) * 0.5;
+                    break;
+                }
+            }
+        }
+
+        function updateSmoke(dt) {
+            for (let i = 0; i < smokeCount; i++) {
+                if (smokeData[i].active) {
+                    smokeData[i].life += dt;
+                    if (smokeData[i].life >= smokeData[i].maxLife) {
+                        smokeData[i].active = false;
+                        smokePositions[i * 3 + 1] = -100;
+                    } else {
+                        smokePositions[i * 3] += smokeData[i].vx * dt;
+                        smokePositions[i * 3 + 1] += smokeData[i].vy * dt;
+                        smokePositions[i * 3 + 2] += smokeData[i].vz * dt;
+                    }
+                }
+            }
+            smokeGeo.attributes.position.needsUpdate = true;
+        }
+
+        /* -------------------------------------------------------------
+           5. تحميل الموديلات الفعلية (City Map + Hyundai Elantra N)
+        ------------------------------------------------------------- */
+        const gltfLoader = new THREE.GLTFLoader();
+        let loadedItems = 0;
+
+        function updateLoadingUI(pct, text) {
+            document.getElementById('barFill').style.width = pct + '%';
+            document.getElementById('loadStatus').innerText = text;
+            if (pct >= 100) {
+                setTimeout(() => {
+                    const scr = document.getElementById('loading-screen');
+                    scr.style.opacity = '0';
+                    setTimeout(() => scr.style.display = 'none', 600);
+                }, 400);
+            }
+        }
+
+        // 1. تحميل الماب (map_njxz.glb)
+        gltfLoader.load('map_njxz.glb', (gltf) => {
+            const mapScene = gltf.scene;
+            // الماب تم تحويلها بمقياس x100 لتتوافق مع القياسات الحقيقية
+            mapScene.scale.set(100, 100, 100);
+            mapScene.position.set(0, 0, 0);
+
+            mapScene.traverse((child) => {
+                if (child.isMesh) {
+                    child.receiveShadow = true;
+                    if (child.material) {
+                        child.material.side = THREE.DoubleSide;
+                    }
+                    // إضافة شبكات الطرق إلى مصفوفة التصادم
+                    const n = child.name.toLowerCase();
+                    if (n.includes('road') || n.includes('ground') || n.includes('asphalt')) {
+                        roadRaycastMeshes.push(child);
+                    }
+                }
+            });
+
+            scene.add(mapScene);
+            loadedItems++;
+            updateLoadingUI(50, 'تم تحميل مسار المدينة بنجاح...');
+            checkAllLoaded();
+        }, (xhr) => {
+            if (xhr.total > 0) {
+                const p = Math.round((xhr.loaded / xhr.total) * 45);
+                updateLoadingUI(p, `جاري تحميل حلبة المدينة (${p}%)...`);
+            }
+        }, (err) => {
+            console.warn("تعذر تحميل ملف الماب، جاري تفعيل الحلبة البديلة:", err);
+            createFallbackGround();
+            loadedItems++;
+            checkAllLoaded();
+        });
+
+        // 2. تحميل سيارة هيونداي إلنترا N (2021-2023_hyundai_elantra_n.glb)
+        gltfLoader.load('2021-2023_hyundai_elantra_n.glb', (gltf) => {
+            const carScene = gltf.scene;
+            // مقياس السيارة بالمتر الحقيقي x100
+            carScene.scale.set(100, 100, 100);
+
+            carScene.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+                const name = child.name.toLowerCase();
+                if (name.includes('front l') || name.includes('front_l')) wheelMeshes.fl.push(child);
+                if (name.includes('front r') || name.includes('front_r')) wheelMeshes.fr.push(child);
+                if (name.includes('rear l') || name.includes('rear_l')) wheelMeshes.rl.push(child);
+                if (name.includes('rear r') || name.includes('rear_r')) wheelMeshes.rr.push(child);
+            });
+
+            carGroup.add(carScene);
+            loadedItems++;
+            updateLoadingUI(90, 'تم إعداد سيارة إلنترا N...');
+            checkAllLoaded();
+        }, (xhr) => {
+            if (xhr.total > 0) {
+                const p = 50 + Math.round((xhr.loaded / xhr.total) * 45);
+                updateLoadingUI(p, `جاري تحميل سيارة إلنترا N (${p}%)...`);
+            }
+        }, (err) => {
+            console.warn("تعذر تحميل سيارة إلنترا N:", err);
+            createFallbackCar();
+            loadedItems++;
+            checkAllLoaded();
+        });
+
+        function checkAllLoaded() {
+            if (loadedItems >= 2) {
+                updateLoadingUI(100, 'جاهز للإنطلاق!');
+                resetCarState();
+            }
+        }
+
+        function createFallbackGround() {
+            const grid = new THREE.GridHelper(1200, 120, 0x00e5ff, 0x1e293b);
+            scene.add(grid);
+            const plane = new THREE.Mesh(
+                new THREE.PlaneGeometry(1500, 1500),
+                new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.9 })
+            );
+            plane.rotation.x = -Math.PI / 2;
+            plane.receiveShadow = true;
+            scene.add(plane);
+            roadRaycastMeshes.push(plane);
+        }
+
+        function createFallbackCar() {
+            const box = new THREE.Mesh(
+                new THREE.BoxGeometry(2.1, 1.4, 4.6),
+                new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.8, roughness: 0.2 })
+            );
+            box.position.y = 0.7;
+            box.castShadow = true;
+            carGroup.add(box);
+        }
+
+        /* -------------------------------------------------------------
+           6. التحكم وإدخالات المستخدم
+        ------------------------------------------------------------- */
+        window.addEventListener('keydown', (e) => {
+            if (!audioCtx) initAudio();
+            switch (e.code) {
+                case 'ArrowUp':
+                case 'KeyW': input.forward = true; break;
+                case 'ArrowDown':
+                case 'KeyS': input.backward = true; break;
+                case 'ArrowLeft':
+                case 'KeyA': input.left = true; break;
+                case 'ArrowRight':
+                case 'KeyD': input.right = true; break;
+                case 'Space': input.handbrake = true; break;
+                case 'ShiftLeft':
+                case 'ShiftRight': input.nitro = true; break;
+                case 'KeyR': resetCarState(); break;
+                case 'KeyC': cycleCamera(); break;
+                case 'KeyM': toggleAudio(); break;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            switch (e.code) {
+                case 'ArrowUp':
+                case 'KeyW': input.forward = false; break;
+                case 'ArrowDown':
+                case 'KeyS': input.backward = false; break;
+                case 'ArrowLeft':
+                case 'KeyA': input.left = false; break;
+                case 'ArrowRight':
+                case 'KeyD': input.right = false; break;
+                case 'Space': input.handbrake = false; break;
+                case 'ShiftLeft':
+                case 'ShiftRight': input.nitro = false; break;
+            }
+        });
+
+        // ربط أزرار شاشة اللمس
+        function bindTouchControl(elemId, keyProp) {
+            const el = document.getElementById(elemId);
+            if (!el) return;
+            const press = (ev) => {
+                ev.preventDefault();
+                if (!audioCtx) initAudio();
+                input[keyProp] = true;
+                el.classList.add('active');
+            };
+            const release = (ev) => {
+                ev.preventDefault();
+                input[keyProp] = false;
+                el.classList.remove('active');
+            };
+            el.addEventListener('touchstart', press, { passive: false });
+            el.addEventListener('touchend', release, { passive: false });
+            el.addEventListener('mousedown', press);
+            el.addEventListener('mouseup', release);
+            el.addEventListener('mouseleave', release);
+        }
+
+        bindTouchControl('t-gas', 'forward');
+        bindTouchControl('t-brake', 'backward');
+        bindTouchControl('t-left', 'left');
+        bindTouchControl('t-right', 'right');
+        bindTouchControl('t-handbrake', 'handbrake');
+        bindTouchControl('t-nitro', 'nitro');
+
+        function cycleCamera() {
+            cameraViewIndex = (cameraViewIndex + 1) % 3;
+        }
+
+        function resetCarState() {
+            vehicle.pos.copy(SPAWN_POS);
+            vehicle.rotY = SPAWN_ROTY;
+            vehicle.speed = 0;
+            vehicle.steerAngle = 0;
+            vehicle.driftSlip = 0;
+            carGroup.position.copy(vehicle.pos);
+            carGroup.rotation.set(0, vehicle.rotY, 0);
+        }
+
+        /* -------------------------------------------------------------
+           7. حلقة التحديث، حساب الارتفاع والمحاكاة الفيزيائية
+        ------------------------------------------------------------- */
+        const raycaster = new THREE.Raycaster();
+        const downVector = new THREE.Vector3(0, -1, 0);
+        let previousTimestamp = performance.now();
+
+        function updateVehicle(dt) {
+            let targetSpeedLimit = vehicle.maxSpeed;
+            let currentAccel = 0;
+
+            // استخدام النيترو
+            const isUsingNitro = input.nitro && vehicle.nitro > 0 && input.forward;
+            if (isUsingNitro) {
+                targetSpeedLimit *= 1.35;
+                currentAccel = vehicle.acceleration * 1.85;
+                vehicle.nitro = Math.max(0, vehicle.nitro - 35 * dt);
+                if (nitroGain) nitroGain.gain.setTargetAtTime(0.2, audioCtx.currentTime, 0.05);
+            } else {
+                vehicle.nitro = Math.min(100, vehicle.nitro + 10 * dt);
+                if (nitroGain) nitroGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+            }
+
+            // التسارع والفرامل
+            if (input.forward) {
+                currentAccel = vehicle.acceleration;
+            } else if (input.backward) {
+                currentAccel = -vehicle.braking;
+            }
+
+            if (currentAccel !== 0) {
+                vehicle.speed += currentAccel * dt;
+            } else {
+                vehicle.speed *= Math.pow(0.975, dt * 60);
+            }
+            vehicle.speed = THREE.MathUtils.clamp(vehicle.speed, vehicle.maxReverse, targetSpeedLimit);
+
+            // زاوية التوجيه
+            let targetSteer = 0;
+            if (input.left) targetSteer += 0.52;
+            if (input.right) targetSteer -= 0.52;
+            vehicle.steerAngle += (targetSteer - vehicle.steerAngle) * Math.min(1.0, 12 * dt);
+
+            // حساب الدريفت والانزلاق الجانبي
+            const speedRatio = Math.abs(vehicle.speed) / vehicle.maxSpeed;
+            if (input.handbrake && Math.abs(vehicle.speed) > 7) {
+                vehicle.isDrifting = true;
+                vehicle.rotY += vehicle.steerAngle * 4.2 * dt;
+                vehicle.speed *= Math.pow(0.965, dt * 60);
+                vehicle.driftSlip = THREE.MathUtils.lerp(vehicle.driftSlip, 1.0, 8 * dt);
+
+                // احتساب النقاط والمضاعف
+                vehicle.combo = THREE.MathUtils.clamp(vehicle.combo + 0.8 * dt, 1, 5);
+                vehicle.score += Math.floor(Math.abs(vehicle.speed) * 35 * vehicle.combo * dt);
+
+                // صوت الصرير والدخان
+                if (skidGain) skidGain.gain.setTargetAtTime(0.3, audioCtx.currentTime, 0.05);
+
+                const rearLeft = vehicle.pos.clone().add(new THREE.Vector3(-0.9, 0, -1.8).applyAxisAngle(new THREE.Vector3(0, 1, 0), vehicle.rotY));
+                const rearRight = vehicle.pos.clone().add(new THREE.Vector3(0.9, 0, -1.8).applyAxisAngle(new THREE.Vector3(0, 1, 0), vehicle.rotY));
+                emitSmoke(rearLeft);
+                emitSmoke(rearRight);
+            } else {
+                vehicle.isDrifting = false;
+                vehicle.driftSlip = THREE.MathUtils.lerp(vehicle.driftSlip, 0.0, 5 * dt);
+                vehicle.rotY += vehicle.steerAngle * speedRatio * 2.5 * dt;
+                vehicle.combo = 1;
+                if (skidGain) skidGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.08);
+            }
+
+            // تطبيق الحركة الموجهة مع الانزلاق
+            const forwardDir = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), vehicle.rotY);
+            vehicle.pos.addScaledVector(forwardDir, vehicle.speed * dt);
+
+            // مطابقة ارتفاع السيارة مع سطح الطريق عبر الـ Raycaster
+            if (roadRaycastMeshes.length > 0) {
+                raycaster.set(new THREE.Vector3(vehicle.pos.x, vehicle.pos.y + 15, vehicle.pos.z), downVector);
+                const hits = raycaster.intersectObjects(roadRaycastMeshes, false);
+                if (hits.length > 0) {
+                    const roadY = hits[0].point.y + 0.05;
+                    vehicle.pos.y += (roadY - vehicle.pos.y) * Math.min(1.0, 15 * dt);
+                }
+            }
+
+            carGroup.position.copy(vehicle.pos);
+            carGroup.rotation.y = vehicle.rotY;
+
+            // إمالة خفيفة للسيارة أثناء المنعطفات السريعة (Body Roll)
+            const rollAngle = -vehicle.steerAngle * speedRatio * 0.12;
+            carGroup.rotation.z = rollAngle;
+
+            // دوران وانعطاف الإطارات
+            const rollDelta = (vehicle.speed * dt) / 0.35;
+            wheelMeshes.fl.forEach(w => { w.rotation.y = vehicle.steerAngle; w.rotation.x += rollDelta; });
+            wheelMeshes.fr.forEach(w => { w.rotation.y = vehicle.steerAngle; w.rotation.x += rollDelta; });
+            wheelMeshes.rl.forEach(w => { w.rotation.x += rollDelta; });
+            wheelMeshes.rr.forEach(w => { w.rotation.x += rollDelta; });
+
+            // حساب الـ RPM وصوت المحرك
+            const kmh = Math.abs(Math.round(vehicle.speed * 3.6));
+            let targetRpm = 900 + (kmh % 45) * 115 + (input.forward ? 400 : 0);
+            if (kmh > 210) targetRpm = 6800;
+            vehicle.rpm += (targetRpm - vehicle.rpm) * 10 * dt;
+
+            if (engineOsc && !isAudioMuted) {
+                const pitch = 35 + (vehicle.rpm / 7000) * 140;
+                engineOsc.frequency.setTargetAtTime(pitch, audioCtx.currentTime, 0.05);
+            }
+
+            // تحديث عناصر الـ HUD
+            document.getElementById('speedMeter').innerText = kmh;
+            document.getElementById('driftScoreDisplay').innerText = vehicle.score.toLocaleString();
+            document.getElementById('nitroMeter').style.width = vehicle.nitro + '%';
+
+            const multBadge = document.getElementById('driftMultiplier');
+            if (vehicle.isDrifting) {
+                multBadge.classList.add('active');
+                multBadge.innerText = 'x' + vehicle.combo.toFixed(1);
+            } else {
+                multBadge.classList.remove('active');
+            }
+
+            // تحديث مؤشر الـ RPM الدائري
+            const rpmPct = THREE.MathUtils.clamp((vehicle.rpm - 800) / 6200, 0, 1);
+            const dashoffset = 440 - (330 * rpmPct);
+            document.getElementById('rpmRing').style.strokeDashoffset = dashoffset;
+
+            // تحديد الغيار
+            let gText = 'D1';
+            if (vehicle.speed < -0.5) gText = 'R';
+            else if (kmh < 42) gText = 'D1';
+            else if (kmh < 85) gText = 'D2';
+            else if (kmh < 130) gText = 'D3';
+            else if (kmh < 172) gText = 'D4';
+            else if (kmh < 210) gText = 'D5';
+            else gText = 'D6';
+            document.getElementById('gearBadge').innerText = gText;
+        }
+
+        /* -------------------------------------------------------------
+           8. تحريك الكاميرا بسلاسة ومتابعة السيارة
+        ------------------------------------------------------------- */
+        function updateCameraRig() {
+            if (cameraViewIndex === 0) {
+                // كاميرا المطاردة الديناميكية من الخلف
+                const distOffset = new THREE.Vector3(0, 3.4, -7.8).applyAxisAngle(new THREE.Vector3(0, 1, 0), vehicle.rotY);
+                const camGoal = vehicle.pos.clone().add(distOffset);
+                camera.position.lerp(camGoal, 0.14);
+                const lookTarget = vehicle.pos.clone().add(new THREE.Vector3(0, 1.3, 1.0));
+                camera.lookAt(lookTarget);
+            } else if (cameraViewIndex === 1) {
+                // كاميرا الكبوت والمقدمة
+                const hoodOffset = new THREE.Vector3(0, 1.45, 0.8).applyAxisAngle(new THREE.Vector3(0, 1, 0), vehicle.rotY);
+                camera.position.copy(vehicle.pos.clone().add(hoodOffset));
+                const lookForward = vehicle.pos.clone().add(new THREE.Vector3(0, 1.3, 12).applyAxisAngle(new THREE.Vector3(0, 1, 0), vehicle.rotY));
+                camera.lookAt(lookForward);
+            } else {
+                // كاميرا الدرون العلوية
+                camera.position.set(vehicle.pos.x, vehicle.pos.y + 45, vehicle.pos.z - 35);
+                camera.lookAt(vehicle.pos);
+            }
+
+            // مزامنة موقع ضوء الشمس لمتابعة السيارة
+            sunLight.position.set(vehicle.pos.x + 120, vehicle.pos.y + 250, vehicle.pos.z + 80);
+            sunLight.target = carGroup;
+        }
+
+        /* -------------------------------------------------------------
+           9. حلقة المعالجة والتشغيل (Animation Loop)
+        ------------------------------------------------------------- */
+        function mainLoop() {
+            requestAnimationFrame(mainLoop);
+            const currentTime = performance.now();
+            const deltaSec = Math.min((currentTime - previousTimestamp) / 1000, 0.1);
+            previousTimestamp = currentTime;
+
+            updateVehicle(deltaSec);
+            updateSmoke(deltaSec);
+            updateCameraRig();
+
+            renderer.render(scene, camera);
+        }
+        mainLoop();
+
+        // تجاوب أبعاد الشاشة
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
