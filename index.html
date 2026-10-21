@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Hyundai Elantra N - Drift Game</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #080c14;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #game-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    /* واجهة العرض العلوية HUD */
+    #hud {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      right: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-card {
+      background: rgba(13, 20, 36, 0.88);
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      border-radius: 14px;
+      padding: 10px 18px;
+      color: #fff;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+    }
+    .car-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: #00e5ff;
+      letter-spacing: 0.5px;
+    }
+    .speedo-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+    .speedo-val {
+      font-size: 38px;
+      font-weight: 900;
+      color: #ffffff;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 15px rgba(0, 229, 255, 0.6);
+    }
+    .speedo-unit {
+      font-size: 13px;
+      color: #8da2c0;
+    }
+    .drift-box {
+      text-align: left;
+    }
+    .drift-label {
+      font-size: 11px;
+      color: #8da2c0;
+    }
+    .drift-score {
+      font-size: 26px;
+      font-weight: 900;
+      color: #ff1744;
+      text-shadow: 0 0 15px rgba(255, 23, 68, 0.8);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* مؤشر توجيه السحب باللمس */
+    #steer-feedback {
+      position: absolute;
+      bottom: 135px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 240px;
+      height: 14px;
+      background: rgba(0, 0, 0, 0.65);
+      border: 1px solid rgba(0, 229, 255, 0.6);
+      border-radius: 10px;
+      overflow: hidden;
+      pointer-events: none;
+      display: none;
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
+    }
+    #steer-indicator {
+      width: 28px;
+      height: 100%;
+      background: linear-gradient(90deg, #00c6ff, #0072ff);
+      border-radius: 6px;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      box-shadow: 0 0 14px #00e5ff;
+      transition: left 0.04s ease-out;
+    }
+    #touch-hint {
+      position: absolute;
+      bottom: 158px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 600;
+      background: rgba(11, 19, 36, 0.75);
+      border: 1px solid rgba(0, 229, 255, 0.25);
+      padding: 5px 16px;
+      border-radius: 16px;
+      pointer-events: none;
+      white-space: nowrap;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    }
+
+    /* أزرار اللمس السفلية */
+    .touch-controls {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      right: 20px;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .btn-group {
+      display: flex;
+      gap: 12px;
+      pointer-events: auto;
+    }
+    .touch-btn {
+      width: 66px;
+      height: 66px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.88);
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+      transition: transform 0.08s, background 0.08s, border-color 0.08s;
+    }
+    .touch-btn:active, .touch-btn.active {
+      transform: scale(0.9);
+    }
+    .btn-gas {
+      background: rgba(0, 200, 83, 0.35);
+      border-color: #00e676;
+    }
+    .btn-gas:active, .btn-gas.active {
+      background: rgba(0, 230, 118, 0.65);
+    }
+    .btn-brake {
+      background: rgba(255, 23, 68, 0.35);
+      border-color: #ff1744;
+    }
+    .btn-brake:active, .btn-brake.active {
+      background: rgba(255, 23, 68, 0.65);
+    }
+    .btn-nitro {
+      background: rgba(0, 176, 255, 0.4);
+      border-color: #00e5ff;
+    }
+    .btn-nitro:active, .btn-nitro.active {
+      background: rgba(0, 229, 255, 0.7);
+    }
+    .btn-drift {
+      background: rgba(255, 145, 0, 0.38);
+      border-color: #ff9100;
+    }
+    .btn-drift:active, .btn-drift.active {
+      background: rgba(255, 145, 0, 0.7);
+    }
+
+    /* شريط تحميل واستيراد الموديل */
+    #model-loader-bar {
+      position: absolute;
+      top: 75px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(13, 20, 36, 0.92);
+      border: 1px solid #00e5ff;
+      border-radius: 20px;
+      padding: 6px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #fff;
+      font-size: 13px;
+      z-index: 20;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      transition: opacity 0.5s;
+    }
+    #file-input {
+      display: none;
+    }
+    .upload-btn {
+      background: #00e5ff;
+      color: #080c14;
+      border: none;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      display: inline-block;
+    }
+
+    /* زر تغيير الكاميرا */
+    #btn-camera {
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(13, 20, 36, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 12px;
+      font-size: 12px;
+      cursor: pointer;
+      z-index: 15;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <div id="hud">
+    <div class="hud-card">
+      <div class="car-title">HYUNDAI ELANTRA N</div>
+      <div class="speedo-wrap">
+        <span class="speedo-val" id="speed-val">0</span>
+        <span class="speedo-unit">كم/س</span>
+      </div>
+    </div>
+    <div class="hud-card drift-box">
+      <div class="drift-label">نقاط الدرفت</div>
+      <div class="drift-score" id="drift-val">0</div>
+    </div>
+  </div>
+
+  <button id="btn-camera">تبديل الكاميرا (C)</button>
+
+  <div id="model-loader-bar">
+    <span id="load-status">جاري فحص موديل السيارة...</span>
+    <label class="upload-btn">
+      اختر الملف يدوياً
+      <input type="file" id="file-input" accept=".glb,.gltf">
+    </label>
+  </div>
+
+  <div id="touch-hint">👈 اسحب يميناً ويساراً للتوجيه باللمس 👉</div>
+  <div id="steer-feedback">
+    <div id="steer-indicator"></div>
+  </div>
+
+  <div class="touch-controls">
+    <div class="btn-group">
+      <div class="touch-btn btn-drift" id="btn-handbrake">جلنط</div>
+      <div class="touch-btn btn-nitro" id="btn-nitro">نيترو</div>
+    </div>
+    <div class="btn-group">
+      <div class="touch-btn btn-brake" id="btn-brake">فرامل</div>
+      <div class="touch-btn btn-gas" id="btn-gas">بنزين</div>
+    </div>
+  </div>
+
+  <script>
+    /* ====================================================================
+       1. إعداد Three.js والمشهد والإضاءات
+       ==================================================================== */
+    const canvas = document.getElementById('game-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a101d);
+    scene.fog = new THREE.FogExp2(0x0a101d, 0.0055);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.2, 1000);
+
+    // إضاءات محيطية ومباشرة
+    const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x0f172a, 0.75);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
+    dirLight.position.set(60, 100, 50);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 10;
+    dirLight.shadow.camera.far = 300;
+    const d = 60;
+    dirLight.shadow.camera.left = -d;
+    dirLight.shadow.camera.right = d;
+    dirLight.shadow.camera.top = d;
+    dirLight.shadow.camera.bottom = -d;
+    scene.add(dirLight);
+
+    /* ====================================================================
+       2. بناء بيئة اللعب (ساحة درفت رياضية)
+       ==================================================================== */
+    // أرضية الأسفلت
+    const floorGeo = new THREE.PlaneGeometry(1000, 1000);
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: 0x141822,
+      roughness: 0.9,
+      metalness: 0.1
+    });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // خطوط الشبكة النيون للملعب
+    const grid = new THREE.GridHelper(1000, 100, 0x00e5ff, 0x1e293b);
+    grid.position.y = 0.02;
+    scene.add(grid);
+
+    // منصات قفز استعراضية (Ramps)
+    const rampMat = new THREE.MeshStandardMaterial({ color: 0x00e5ff, roughness: 0.3, metalness: 0.4 });
+    const rampBorderMat = new THREE.MeshStandardMaterial({ color: 0xff1744, roughness: 0.4 });
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const radius = 95;
+      const rampGroup = new THREE.Group();
+
+      const ramp = new THREE.Mesh(new THREE.BoxGeometry(11, 2.8, 16), rampMat);
+      ramp.position.y = 0.4;
+      ramp.rotation.x = 0.18;
+      ramp.castShadow = true;
+      ramp.receiveShadow = true;
+      rampGroup.add(ramp);
+
+      // حواف ملونة
+      const edgeL = new THREE.Mesh(new THREE.BoxGeometry(0.6, 3.2, 16), rampBorderMat);
+      edgeL.position.set(-5.5, 0.4, 0);
+      edgeL.rotation.x = 0.18;
+      rampGroup.add(edgeL);
+      const edgeR = new THREE.Mesh(new THREE.BoxGeometry(0.6, 3.2, 16), rampBorderMat);
+      edgeR.position.set(5.5, 0.4, 0);
+      edgeR.rotation.x = 0.18;
+      rampGroup.add(edgeR);
+
+      rampGroup.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      rampGroup.rotation.y = angle + Math.PI / 2;
+      scene.add(rampGroup);
+    }
+
+    // أبراج إنارة حول المضمار
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const r = 160;
+      const pole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.4, 0.5, 24),
+        new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 })
+      );
+      pole.position.set(Math.cos(angle) * r, 12, Math.sin(angle) * r);
+      scene.add(pole);
+
+      const lamp = new THREE.Mesh(
+        new THREE.BoxGeometry(3, 1, 3),
+        new THREE.MeshBasicMaterial({ color: 0x00e5ff })
+      );
+      lamp.position.set(Math.cos(angle) * r, 24, Math.sin(angle) * r);
+      scene.add(lamp);
+    }
+
+    /* ====================================================================
+       3. سيارة Hyundai Elantra N (موديل GLB أو نموذج بديل فائق الدقة)
+       ==================================================================== */
+    const carRoot = new THREE.Group();
+    scene.add(carRoot);
+
+    // مجسم بديل مطابق لفئة N في حال عدم تشغيل السيرفر المحلي
+    function createDetailedElantraN() {
+      const group = new THREE.Group();
+
+      // ألوان Elantra N
+      const blueMat = new THREE.MeshStandardMaterial({ color: 0x6e9ec4, roughness: 0.25, metalness: 0.75 }); // Performance Blue
+      const redLipMat = new THREE.MeshStandardMaterial({ color: 0xff1744, roughness: 0.35 }); // N Red Accent
+      const blackMat = new THREE.MeshStandardMaterial({ color: 0x111622, roughness: 0.4, metalness: 0.6 });
+      const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x0f172a, roughness: 0.1, transmission: 0.75, transparent: true });
+
+      // الهيكل السفلي
+      const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.58, 4.45), blueMat);
+      chassis.position.y = 0.52;
+      chassis.castShadow = true;
+      group.add(chassis);
+
+      // مقدمة حادة ومشتت هواء
+      const hood = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.25, 1.4), blueMat);
+      hood.position.set(0, 0.68, -1.45);
+      hood.rotation.x = 0.12;
+      group.add(hood);
+
+      // المقصورة والزجاج
+      const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.58, 2.2), glassMat);
+      cabin.position.set(0, 1.05, -0.15);
+      cabin.castShadow = true;
+      group.add(cabin);
+
+      // خط N الأحمر السفلي حول كامل السيارة
+      const redLip = new THREE.Mesh(new THREE.BoxGeometry(1.98, 0.08, 4.5), redLipMat);
+      redLip.position.y = 0.22;
+      group.add(redLip);
+
+      // الشبك الأمامي الأسود
+      const grille = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.35, 0.15), blackMat);
+      grille.position.set(0, 0.45, -2.25);
+      group.add(grille);
+
+      // أنوار أمامية LED
+      const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const headL = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.12, 0.15), lightMat);
+      headL.position.set(-0.7, 0.62, -2.22);
+      group.add(headL);
+      const headR = headL.clone();
+      headR.position.x = 0.7;
+      group.add(headR);
+
+      // أنوار خلفية LED شريطية متصلة
+      const tailMat = new THREE.MeshBasicMaterial({ color: 0xff1744 });
+      const tailLight = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.1, 0.1), tailMat);
+      tailLight.position.set(0, 0.72, 2.24);
+      group.add(tailLight);
+
+      // جناح خلفي رياضي بارز
+      const spoiler = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.06, 0.35), blackMat);
+      spoiler.position.set(0, 1.15, 2.05);
+      group.add(spoiler);
+      const spoilerL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.35, 0.18), blackMat);
+      spoilerL.position.set(-0.65, 0.98, 2.05);
+      group.add(spoilerL);
+      const spoilerR = spoilerL.clone();
+      spoilerR.position.x = 0.65;
+      group.add(spoilerR);
+
+      // فتحات عادم مزدوجة رياضية
+      const exhaustMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
+      const exL = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.25, 16), exhaustMat);
+      exL.rotation.x = Math.PI / 2;
+      exL.position.set(-0.55, 0.28, 2.25);
+      group.add(exL);
+      const exR = exL.clone();
+      exR.position.x = 0.55;
+      group.add(exR);
+
+      // 4 عجلات رياضية مقاس 19 بوصة مع كليبرات حمراء
+      const wheelGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.32, 24);
+      wheelGeo.rotateZ(Math.PI / 2);
+      const tireMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 });
+      const rimMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85, roughness: 0.2 });
+
+      const wheelPositions = [
+        [-0.98, 0.38, -1.4], [0.98, 0.38, -1.4],
+        [-0.98, 0.38, 1.4],  [0.98, 0.38, 1.4]
+      ];
+      wheelPositions.forEach((pos, idx) => {
+        const wGroup = new THREE.Group();
+        const tire = new THREE.Mesh(wheelGeo, tireMat);
+        tire.castShadow = true;
+        wGroup.add(tire);
+
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.33, 16), rimMat);
+        rim.rotateZ(Math.PI / 2);
+        wGroup.add(rim);
+
+        // كليبر أحمر
+        const cal = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.2, 0.15), redLipMat);
+        cal.position.set(pos[0] > 0 ? 0.12 : -0.12, 0.12, 0);
+        wGroup.add(cal);
+
+        wGroup.position.set(...pos);
+        group.add(wGroup);
+      });
+
+      return group;
+    }
+
+    let activeCarModel = createDetailedElantraN();
+    carRoot.add(activeCarModel);
+
+    // تحميل ملف GLB تلقائياً أو عبر المتصفح
+    const loader = new THREE.GLTFLoader();
+    const modelStatus = document.getElementById('load-status');
+
+    function applyLoadedModel(gltf) {
+      carRoot.remove(activeCarModel);
+      const model = gltf.scene;
+
+      // ضبط الحجم وتوسيط السيارة بدقة
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+
+      model.position.sub(center);
+      model.position.y += size.y / 2;
+
+      // التأكد من توجيه السيارة نحو الأمام
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+
+      activeCarModel = model;
+      carRoot.add(activeCarModel);
+
+      modelStatus.textContent = 'تم تحميل موديل Hyundai Elantra N بنجاح!';
+      setTimeout(() => {
+        const bar = document.getElementById('model-loader-bar');
+        bar.style.opacity = '0';
+        setTimeout(() => bar.style.display = 'none', 500);
+      }, 2500);
+    }
+
+    // محاولة قراءة الملف المرفق في نفس المجلد
+    loader.load('2021-2023_hyundai_elantra_n.glb', applyLoadedModel, undefined, () => {
+      modelStatus.textContent = 'يعمل بالموديل المدمج (اختر ملف .glb لو أحببت)';
+    });
+
+    // استيراد الملف يدوياً في حال تشغيل الملف محلياً دون سيرفر
+    document.getElementById('file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        modelStatus.textContent = 'جاري قراءة الملف...';
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          loader.parse(evt.target.result, '', applyLoadedModel, (err) => {
+            alert('حدث خطأ أثناء قراءة ملف الموديل');
+          });
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    });
+
+    /* ====================================================================
+       4. نظام التحكم باللمس عبر السحب (Touch Swipe / Drag Steering)
+       ==================================================================== */
+    const input = {
+      steer: 0,         // -1 (يسار) إلى +1 (يمين)
+      throttle: 0,      // تسارع
+      brake: 0,         // فرامل / رجوع للخلف
+      handbrake: false,   // جلنط درفت
+      nitro: false       // نيترو
+    };
+
+    let touchSteerId = null;
+    let touchStartX = 0;
+    const steerFeedback = document.getElementById('steer-feedback');
+    const steerIndicator = document.getElementById('steer-indicator');
+
+    // كشف السحب في أي مكان بالشاشة للتوجيه يميناً ويساراً
+    window.addEventListener('touchstart', (e) => {
+      for (let t of e.changedTouches) {
+        // عدم مقاطعة أزرار الدواسات
+        if (!e.target.closest('.touch-btn') && !e.target.closest('.upload-btn') && e.target.id !== 'btn-camera') {
+          touchSteerId = t.identifier;
+          touchStartX = t.clientX;
+          steerFeedback.style.display = 'block';
+          break;
+        }
+      }
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+      if (touchSteerId === null) return;
+      for (let t of e.changedTouches) {
+        if (t.identifier === touchSteerId) {
+          const deltaX = t.clientX - touchStartX;
+          const maxDrag = 90; // مسافة السحب بالبكسل لأقصى زاوية
+          let val = deltaX / maxDrag;
+          val = Math.max(-1, Math.min(1, val));
+
+          // سحب يمين -> لف يمين (+1) | سحب يسار -> لف يسار (-1)
+          input.steer = val;
+
+          // تحديث المؤشر البصري
+          const pct = 50 + (val * 42);
+          steerIndicator.style.left = pct + '%';
+        }
+      }
+    }, { passive: false });
+
+    function endTouchSteer(e) {
+      if (touchSteerId === null) return;
+      for (let t of e.changedTouches) {
+        if (t.identifier === touchSteerId) {
+          touchSteerId = null;
+          input.steer = 0;
+          steerIndicator.style.left = '50%';
+          setTimeout(() => {
+            if (touchSteerId === null) steerFeedback.style.display = 'none';
+          }, 350);
+        }
+      }
+    }
+    window.addEventListener('touchend', endTouchSteer);
+    window.addEventListener('touchcancel', endTouchSteer);
+
+    // دعم السحب بالفأرة على الكمبيوتر أيضاً
+    let isMouseDown = false;
+    let mouseStartX = 0;
+    window.addEventListener('mousedown', (e) => {
+      if (!e.target.closest('.touch-btn') && !e.target.closest('.upload-btn') && e.target.id !== 'btn-camera') {
+        isMouseDown = true;
+        mouseStartX = e.clientX;
+        steerFeedback.style.display = 'block';
+      }
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!isMouseDown) return;
+      const deltaX = e.clientX - mouseStartX;
+      let val = Math.max(-1, Math.min(1, deltaX / 90));
+      input.steer = val;
+      steerIndicator.style.left = (50 + val * 42) + '%';
+    });
+    window.addEventListener('mouseup', () => {
+      if (!isMouseDown) return;
+      isMouseDown = false;
+      input.steer = 0;
+      steerIndicator.style.left = '50%';
+      steerFeedback.style.display = 'none';
+    });
+
+    // أزرار الدواسات باللمس
+    function bindBtn(id, downFn, upFn) {
+      const el = document.getElementById(id);
+      const start = (e) => { e.preventDefault(); el.classList.add('active'); downFn(); };
+      const end = (e) => { e.preventDefault(); el.classList.remove('active'); upFn(); };
+      el.addEventListener('touchstart', start, { passive: false });
+      el.addEventListener('touchend', end);
+      el.addEventListener('mousedown', start);
+      el.addEventListener('mouseup', end);
+    }
+
+    bindBtn('btn-gas', () => input.throttle = 1, () => input.throttle = 0);
+    bindBtn('btn-brake', () => input.brake = 1, () => input.brake = 0);
+    bindBtn('btn-handbrake', () => input.handbrake = true, () => input.handbrake = false);
+    bindBtn('btn-nitro', () => input.nitro = true, () => input.nitro = false);
+
+    // مفاتيح الكيبورد
+    window.addEventListener('keydown', (e) => {
+      const k = e.key.toLowerCase();
+      if (k === 'arrowright' || k === 'd') input.steer = 1;
+      if (k === 'arrowleft' || k === 'a') input.steer = -1;
+      if (k === 'arrowup' || k === 'w') input.throttle = 1;
+      if (k === 'arrowdown' || k === 's') input.brake = 1;
+      if (e.key === ' ') input.handbrake = true;
+      if (e.key === 'Shift') input.nitro = true;
+      if (k === 'c') toggleCamera();
+    });
+
+    window.addEventListener('keyup', (e) => {
+      const k = e.key.toLowerCase();
+      if (['arrowright', 'd', 'arrowleft', 'a'].includes(k)) input.steer = 0;
+      if (['arrowup', 'w'].includes(k)) input.throttle = 0;
+      if (['arrowdown', 's'].includes(k)) input.brake = 0;
+      if (e.key === ' ') input.handbrake = false;
+      if (e.key === 'Shift') input.nitro = false;
+    });
+
+    let cameraMode = 0; // 0 = خلفية سينمائية, 1 = من داخل الكابينة, 2 = نظرة علوية
+    function toggleCamera() {
+      cameraMode = (cameraMode + 1) % 3;
+    }
+    document.getElementById('btn-camera').addEventListener('click', toggleCamera);
+
+    /* ====================================================================
+       5. محرك الصوت البرمجي التفاعلي
+       ==================================================================== */
+    let audioCtx = null;
+    let engineOsc = null;
+    let engineGain = null;
+
+    function initAudio() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      engineOsc = audioCtx.createOscillator();
+      engineOsc.type = 'sawtooth';
+      engineGain = audioCtx.createGain();
+      engineGain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+      engineOsc.connect(engineGain);
+      engineGain.connect(audioCtx.destination);
+      engineOsc.start();
+    }
+    window.addEventListener('touchstart', initAudio, { once: true });
+    window.addEventListener('click', initAudio, { once: true });
+
+    /* ====================================================================
+       6. حلقة الفيزياء، الدرفت، وتحديث الإطارات
+       ==================================================================== */
+    const car = {
+      pos: new THREE.Vector3(0, 0, 0),
+      speed: 0,
+      heading: 0,
+      driftScore: 0,
+      maxSpeed: 65,
+      accel: 30,
+      turnRate: 2.4
+    };
+
+    let lastTime = performance.now();
+    const speedEl = document.getElementById('speed-val');
+    const driftEl = document.getElementById('drift-val');
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      // قوة النيترو
+      const nitroMul = input.nitro ? 1.65 : 1.0;
+      const topSpeed = car.maxSpeed * nitroMul;
+
+      // تسارع وفرامل
+      if (input.throttle > 0) {
+        car.speed += car.accel * nitroMul * dt;
+      } else if (input.brake > 0) {
+        if (car.speed > 1) {
+          car.speed -= 48 * dt; // فرملة قوية
+        } else {
+          car.speed -= 16 * dt; // رجوع للخلف
+        }
+      } else {
+        car.speed *= Math.pow(0.92, dt * 30); // احتكاك طبيعي
+      }
+
+      car.speed = Math.max(-18, Math.min(topSpeed, car.speed));
+
+      // التوجيه والدرفت
+      if (Math.abs(car.speed) > 0.4) {
+        const forwardDir = car.speed > 0 ? 1 : -1;
+        let turn = input.steer;
+
+        // مضاعفة التوجيه عند الجلنط لتنفيذ الدرفت
+        if (input.handbrake) {
+          turn *= 1.75;
+          car.speed *= Math.pow(0.965, dt * 30);
+          car.driftScore += Math.floor(Math.abs(car.speed) * Math.abs(turn) * 25 * dt);
+        }
+
+        car.heading -= turn * car.turnRate * forwardDir * dt * (Math.abs(car.speed) / (car.maxSpeed * 0.65));
+      }
+
+      // تحريك موقع السيارة
+      const dist = car.speed * dt;
+      car.pos.x += Math.sin(car.heading) * dist;
+      car.pos.z += Math.cos(car.heading) * dist;
+
+      carRoot.position.copy(car.pos);
+      carRoot.rotation.y = car.heading + Math.PI;
+
+      // ميلان الهيكل في المنعطفات
+      activeCarModel.rotation.z = -input.steer * 0.07 * (Math.abs(car.speed) / car.maxSpeed);
+
+      // أوضاع الكاميرا
+      if (cameraMode === 0) {
+        // خلفية تتبعية
+        const camDist = input.nitro ? 10.5 : 8.5;
+        const camH = 3.6;
+        const targetX = car.pos.x - Math.sin(car.heading) * camDist;
+        const targetZ = car.pos.z - Math.cos(car.heading) * camDist;
+        camera.position.x += (targetX - camera.position.x) * 0.12;
+        camera.position.z += (targetZ - camera.position.z) * 0.12;
+        camera.position.y += (car.pos.y + camH - camera.position.y) * 0.12;
+        camera.lookAt(car.pos.x, car.pos.y + 1.2, car.pos.z);
+      } else if (cameraMode === 1) {
+        // كابينة القيادة
+        camera.position.set(car.pos.x, car.pos.y + 1.25, car.pos.z);
+        const lookTarget = new THREE.Vector3(
+          car.pos.x + Math.sin(car.heading) * 10,
+          car.pos.y + 1.1,
+          car.pos.z + Math.cos(car.heading) * 10
+        );
+        camera.lookAt(lookTarget);
+      } else {
+        // نظرة جوية علوية
+        camera.position.set(car.pos.x, car.pos.y + 35, car.pos.z + 5);
+        camera.lookAt(car.pos.x, car.pos.y, car.pos.z);
+      }
+
+      // تحديث شاشة العدادات
+      const kmh = Math.floor(Math.abs(car.speed) * 3.6);
+      speedEl.textContent = kmh;
+      driftEl.textContent = car.driftScore.toLocaleString();
+
+      // تردد صوت المحرك
+      if (engineOsc && audioCtx) {
+        const freq = 48 + (kmh * 2.1) + (input.throttle ? 32 : 0) + (input.nitro ? 45 : 0);
+        engineOsc.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.05);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
